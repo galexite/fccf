@@ -1,22 +1,18 @@
 #ifndef LEXER_H
 #define LEXER_H
-#include <algorithm>
-#include <string_view>
-#include <unordered_set>
-#include <vector>
-
 #include <token.hpp>
+
+#include <string_view>
 
 #define FMT_HEADER_ONLY 1
 #include <fmt/color.h>
 #include <fmt/core.h>
 
-class lexer
-{
+class lexer {
   std::string_view m_input;
-  fmt::memory_buffer* m_out;
-  std::size_t m_index {0};
-  bool m_is_stdout {true};
+  fmt::memory_buffer *m_out;
+  std::size_t m_index{0};
+  bool m_is_stdout{true};
 
   char previous() const;
   char current() const;
@@ -35,7 +31,7 @@ class lexer
 
 public:
   void tokenize_and_pretty_print(std::string_view source,
-                                 fmt::memory_buffer* out,
+                                 fmt::memory_buffer *out,
                                  bool is_stdout = true);
 };
 

@@ -1,23 +1,21 @@
-#include <cstring>
+#include "searcher.hpp"
+
+#include <argparse.hpp>
+#include <nlohmann/json.hpp>
+#include <unistd.h>
+
 #include <filesystem>
-#include <fstream>
 #include <iostream>
 #include <string>
 #include <string_view>
 #include <vector>
 
-#include <argparse.hpp>
-#include <nlohmann/json.hpp>
-#include "searcher.hpp"
-#include <unistd.h>
-
 namespace fs = std::filesystem;
 
-int main(int argc, char* argv[])
-{
+int main(int argc, char *argv[]) {
   auto is_stdout = isatty(STDOUT_FILENO) == 1;
   std::ios_base::sync_with_stdio(false);
-  std::cin.tie(NULL);
+  std::cin.tie(nullptr);
   argparse::ArgumentParser program("fccf", "0.6.0");
   program.add_argument("query");
   program.add_argument("path").remaining();
@@ -49,9 +47,8 @@ int main(int argc, char* argv[])
       .append();
 
   program.add_argument("--no-ignore-dirs")
-      .help(
-          "Do not ignore files under an integrated list of blocklisted "
-          "directories (VCS, IDE, common build directories, etc.)")
+      .help("Do not ignore files under an integrated list of blocklisted "
+            "directories (VCS, IDE, common build directories, etc.)")
       .default_value(false)
       .implicit_value(true);
 
@@ -91,9 +88,8 @@ int main(int argc, char* argv[])
       .implicit_value(true);
 
   program.add_argument("-F")
-      .help(
-          "Search for any function or function template or class member "
-          "function")
+      .help("Search for any function or function template or class member "
+            "function")
       .default_value(false)
       .implicit_value(true);
 
@@ -143,9 +139,8 @@ int main(int argc, char* argv[])
       .implicit_value(true);
 
   program.add_argument("--using-declaration")
-      .help(
-          "Search for using declarations, using directives, and type alias "
-          "declarations")
+      .help("Search for using declarations, using directives, and type alias "
+            "declarations")
       .default_value(false)
       .implicit_value(true);
 
@@ -160,9 +155,8 @@ int main(int argc, char* argv[])
       .implicit_value(true);
 
   program.add_argument("--ie", "--include-expressions")
-      .help(
-          "Search for expressions that refer to some value or "
-          "member, e.g., function, variable, or enumerator.")
+      .help("Search for expressions that refer to some value or "
+            "member, e.g., function, variable, or enumerator.")
       .default_value(false)
       .implicit_value(true);
 
@@ -187,9 +181,8 @@ int main(int argc, char* argv[])
       .implicit_value(true);
 
   program.add_argument("-c")
-      .help(
-          "Search for any static_cast, dynamic_cast, reinterpret_cast, or"
-          "const_cast expression")
+      .help("Search for any static_cast, dynamic_cast, reinterpret_cast, or"
+            "const_cast expression")
       .default_value(false)
       .implicit_value(true);
 
@@ -209,11 +202,11 @@ int main(int argc, char* argv[])
       .help("Additional include directories");
 
   program.add_argument("-l", "--language")
-      .default_value<std::string>(std::string {"c++"})
+      .default_value<std::string>(std::string{"c++"})
       .help("Language option used by clang");
 
   program.add_argument("--std")
-      .default_value<std::string>(std::string {"c++17"})
+      .default_value<std::string>(std::string{"c++17"})
       .help("C++ standard to be used by clang");
 
   program.add_argument("--nc", "--no-color")
@@ -223,7 +216,7 @@ int main(int argc, char* argv[])
 
   try {
     program.parse_args(argc, argv);
-  } catch (const std::runtime_error& err) {
+  } catch (const std::runtime_error &err) {
     if (program.get<bool>("--help")) {
       std::cout << program << std::endl;
       return 0;
@@ -237,7 +230,7 @@ int main(int argc, char* argv[])
   std::vector<std::string> paths;
   try {
     paths = program.get<std::vector<std::string>>("path");
-  } catch (const std::logic_error& e) {
+  } catch (const std::logic_error &e) {
     // No path provided
     paths = {"."};
   }
@@ -296,28 +289,27 @@ int main(int argc, char* argv[])
   }
 
   auto no_filter =
-      !(search_for_enum || search_for_struct || search_for_union
-        || search_for_member_function || search_for_function
-        || search_for_function_template || search_for_any_function
-        || search_for_class || search_for_class_template
-        || search_for_class_constructor || search_for_class_destructor
-        || search_for_any_class_or_struct || search_for_typedef
-        || search_for_using_declaration || search_for_namespace_alias
-        || search_for_variable_declaration || search_for_parameter_declaration
-        || search_for_static_cast || search_for_dynamic_cast
-        || search_for_reinterpret_cast || search_for_const_cast
-        || search_for_any_cast || search_for_throw_expression
-        || search_for_for_statement);
+      !(search_for_enum || search_for_struct || search_for_union ||
+        search_for_member_function || search_for_function ||
+        search_for_function_template || search_for_any_function ||
+        search_for_class || search_for_class_template ||
+        search_for_class_constructor || search_for_class_destructor ||
+        search_for_any_class_or_struct || search_for_typedef ||
+        search_for_using_declaration || search_for_namespace_alias ||
+        search_for_variable_declaration || search_for_parameter_declaration ||
+        search_for_static_cast || search_for_dynamic_cast ||
+        search_for_reinterpret_cast || search_for_const_cast ||
+        search_for_any_cast || search_for_throw_expression ||
+        search_for_for_statement);
 
-  auto ends_with = [](std::string_view str, std::string_view suffix) -> bool
-  {
-    return str.size() >= suffix.size()
-        && 0 == str.compare(str.size() - suffix.size(), suffix.size(), suffix);
+  auto ends_with = [](std::string_view str, std::string_view suffix) -> bool {
+    return str.size() >= suffix.size() &&
+           0 == str.compare(str.size() - suffix.size(), suffix.size(), suffix);
   };
 
-  std::vector<std::string> include_directory_list;  // {"-I."};
+  std::vector<std::string> include_directory_list; // {"-I."};
 
-  for (auto& id : include_dirs) {
+  for (auto &id : include_dirs) {
     include_directory_list.push_back("-I" + id);
   }
 
@@ -376,40 +368,38 @@ int main(int argc, char* argv[])
 
   nlohmann::json json_array = nlohmann::json::array();
   if (is_json) {
-    searcher.m_custom_printer = [&json_array](std::string_view filename,
-                                              bool is_stdout,
-                                              unsigned start_line,
-                                              unsigned end_line,
-                                              std::string_view code_snippet)
-    {
-      nlohmann::json obj;
-      obj["filename"] = filename;
-      obj["snippet"] = code_snippet;
-      obj["start_line"] = start_line;
-      obj["end_line"] = end_line;
-      json_array.push_back(obj);
-    };
+    searcher.m_custom_printer =
+        [&json_array](std::string_view filename, bool is_stdout,
+                      unsigned start_line, unsigned end_line,
+                      std::string_view code_snippet) {
+          nlohmann::json obj;
+          obj["filename"] = filename;
+          obj["snippet"] = code_snippet;
+          obj["start_line"] = start_line;
+          obj["end_line"] = end_line;
+          json_array.push_back(obj);
+        };
   }
 
-  for (const auto& path : paths) {
+  for (const auto &path : paths) {
     // Update clang options
     auto parent_path = path == "." ? "." : fs::path(path).parent_path();
     auto parent_path_string = parent_path.c_str();
 
     // Iterate over the `std::filesystem::directory_entry` elements using `auto`
-    for (auto const& dir_entry : fs::recursive_directory_iterator(parent_path))
-    {
-      auto& path = dir_entry.path();
+    for (auto const &dir_entry :
+         fs::recursive_directory_iterator(parent_path)) {
+      auto &path = dir_entry.path();
       if (fs::is_directory(path)) {
         // If directory name is include
         std::string_view directory_name = path.filename().c_str();
         if (ends_with(directory_name, "include")) {
-          include_directory_list.push_back("-I" + std::string {path});
+          include_directory_list.push_back("-I" + std::string{path});
         }
       }
     }
 
-    std::vector<const char*> clang_options;
+    std::vector<const char *> clang_options;
     clang_options.push_back("-x");
     clang_options.push_back(language_option.c_str());
 
@@ -418,7 +408,7 @@ int main(int argc, char* argv[])
       clang_options.push_back(language_standard.c_str());
     }
 
-    for (auto& include_directory : include_directory_list) {
+    for (auto &include_directory : include_directory_list) {
       clang_options.push_back(include_directory.c_str());
     }
 
@@ -427,20 +417,18 @@ int main(int argc, char* argv[])
     // Run the search
 
     if (fs::is_regular_file(fs::path(path))) {
-      searcher.read_file_and_search((const char*)path.c_str());
+      searcher.read_file_and_search((const char *)path.c_str());
     } else if (fs::is_directory(fs::path(path))) {
-      searcher.directory_search((const char*)path.c_str());
+      searcher.directory_search((const char *)path.c_str());
     } else {
       fmt::print(fmt::fg(fmt::color::red) | fmt::emphasis::bold,
-                 "\nError: '{}' is not a valid file or directory\n",
-                 path);
+                 "\nError: '{}' is not a valid file or directory\n", path);
       std::exit(1);
     }
   }
 
   if (is_json) {
-    fmt::print("{}", json_array.dump());
+    std::cout << json_array.dump();
   }
-  fmt::print("\n");
   return 0;
 }
