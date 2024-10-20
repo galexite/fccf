@@ -10,7 +10,8 @@ Checks: "\
   readability-*,\
   fuchsia-multiple-inheritance,\
   -misc-non-private-member-variables-in-classes,\
-  -modernize-use-trailing-return-type"
+  -modernize-use-trailing-return-type,\
+  -bugprone-easily-swappable-parameters"
 WarningsAsErrors: ''
 CheckOptions:
   - key: 'bugprone-argument-comment.StrictMode'

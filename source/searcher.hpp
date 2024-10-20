@@ -52,7 +52,7 @@ struct searcher {
 
   static void file_search(std::string_view filename, std::string_view haystack);
   static void read_file_and_search(const char *path);
-  static void directory_search(const char *path);
+  static void directory_search(const char *search_path);
 };
 
 } // namespace search
