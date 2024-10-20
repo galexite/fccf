@@ -1,10 +1,10 @@
 #include "searcher.hpp"
 
 #include "lexer.hpp"
+#include "strstr.hpp"
 
 #include <clang-c/Index.h> // This is libclang.
 #include <fnmatch.h>
-#include <sse2_strstr.hpp>
 
 #include <algorithm>
 #include <array>
@@ -87,12 +87,12 @@ void searcher::file_search(std::string_view filename,
   std::size_t current_line_number = 1;
   auto no_file_name = filename.empty();
 
-#if defined(__SSE2__)
+#if defined(HAVE_SIMD_STRSTR)
   std::string_view view(it, haystack_end - it);
   if (view.empty()) {
     it = haystack_end;
   } else {
-    auto pos = sse2_strstr_v2(std::string_view(it, haystack_end - it), m_query);
+    auto pos = STRSTR_IMPL(std::string_view(it, haystack_end - it), m_query);
     if (pos != std::string::npos) {
       it += pos;
     } else {

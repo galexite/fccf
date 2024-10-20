@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.14)
+cmake_minimum_required(VERSION 3.30)
 
 include(cmake/prelude.cmake)
 
@@ -34,7 +34,7 @@ FetchContent_Declare(argparse
 )
 FetchContent_MakeAvailable(argparse)
 
-# ---- Fmt ----------------
+# ---- fmt ----------------
 
 set(FMT_HEADERS "")
 
@@ -51,7 +51,19 @@ FetchContent_Declare(json
 )
 FetchContent_MakeAvailable(json)
 
-# ---- clang ---------------
+# ---- strstr ----------------
+
+FetchContent_Declare(sse4_strstr
+  GIT_REPOSITORY https://github.com/WojciechMula/sse4-strstr.git
+  GIT_TAG 9cdc4b6df817c8a8c67a1cebdc7e18a1da35f407
+)
+FetchContent_MakeAvailable(sse4_strstr)
+
+add_library(sse4_strstr OBJECT source/strstr.cpp)
+target_compile_features(sse4_strstr PRIVATE cxx_std_17)
+target_include_directories(sse4_strstr PRIVATE ${sse4_strstr_SOURCE_DIR})
+
+# ---- clang ----------------
 
 find_package(Clang REQUIRED CONFIG)
 
@@ -70,10 +82,7 @@ include(AddLLVM)
 include(AddClang)
 
 include_directories(${LLVM_INCLUDE_DIRS})
-include_directories(${CLANG_INCLUDE_DIRS})
-
 add_definitions(${LLVM_DEFINITIONS})
-add_definitions(${CLANG_DEFINITIONS})
 
 # ---- Threads ------------
 if(NOT ANDROID)
@@ -90,7 +99,6 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -fexceptions")
 add_library(
   fccf_lib OBJECT
   source/searcher.cpp
-  source/sse2_strstr.cpp
   source/lexer.cpp
   source/utf8.cpp
 )
@@ -104,11 +112,10 @@ target_include_directories(
 
 target_compile_features(fccf_lib PUBLIC cxx_std_17)
 target_compile_options(fccf_lib PRIVATE -fexceptions)
-set(LIBS fmt::fmt)
 if(NOT ANDROID)
-  list(APPEND LIBS Threads::Threads)
+  target_link_libraries(fccf_lib PRIVATE Threads::Threads)
 endif()
-target_link_libraries(fccf_lib PRIVATE ${LIBS})
+target_link_libraries(fccf_lib PRIVATE fmt::fmt sse4_strstr)
 
 # ---- Declare executable ----
 
@@ -127,6 +134,7 @@ target_link_libraries(fccf_exe PRIVATE fccf_lib
   fmt::fmt
   libclang
   nlohmann_json::nlohmann_json
+  sse4_strstr
 )
 
 # ---- Install rules ----
