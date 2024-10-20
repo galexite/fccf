@@ -4,6 +4,23 @@
 
 #include <unordered_set>
 
+namespace {
+
+std::size_t get_number_of_characters(std::string_view str) {
+  int count = 0;
+  for (std::size_t i = 0; i < str.size();) {
+    char c = str[i];
+    auto len = u8_seqlen(&c);
+    i += len;
+    count += 1;
+  }
+  return count;
+}
+
+constexpr unsigned char ascii_end = 0x80;
+
+} // namespace
+
 char lexer::previous() const { return m_input[m_index - 1]; }
 
 char lexer::current() const { return m_input[m_index]; }
@@ -32,27 +49,15 @@ bool lexer::is_block_comment() {
 
 bool lexer::is_start_of_identifier() {
   char c = current();
-  if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c == '_') ||
-      ((unsigned char)c >= 0x80)) {
-    return true;
-  } else {
-    return false;
-  }
+  return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c == '_') ||
+         ((unsigned char)c >= ascii_end);
 }
 
 bool lexer::is_start_of_string() {
-  if (current() == '"' || current() == '\'') {
-    return true;
-  }
-  return false;
+  return current() == '"' || current() == '\'';
 }
 
-bool lexer::is_start_of_number() {
-  if (isdigit(current())) {
-    return true;
-  }
-  return false;
-}
+bool lexer::is_start_of_number() { return isdigit(current()) != 0; }
 
 void lexer::process_line_comment() {
   while (m_index < m_input.size()) {
@@ -206,32 +211,12 @@ bool lexer::process_identifier(bool maybe_class_or_struct) {
                                                              "xor",
                                                              "xor_eq"};
 
-  static const std::unordered_set<std::string_view> types{"auto",
-                                                          "bool",
-                                                          "char",
-                                                          "char8_t",
-                                                          "char16_t",
-                                                          "char32_t",
-                                                          "double",
-                                                          "enum",
-                                                          "false",
-                                                          "float",
-                                                          "int",
-                                                          "int8_t",
-                                                          "int16_t",
-                                                          "int32_t",
-                                                          "int64_t",
-                                                          "uint8_t",
-                                                          "uint16_t",
-                                                          "uint32_t",
-                                                          "uint64_t",
-                                                          "long",
-                                                          "short",
-                                                          "signed",
-                                                          "size_t"
-                                                          "true",
-                                                          "unsigned",
-                                                          "wchar_t"};
+  static const std::unordered_set<std::string_view> types{
+      "auto",     "bool",    "char",    "char8_t", "char16_t", "char32_t",
+      "double",   "enum",    "false",   "float",   "int",      "int8_t",
+      "int16_t",  "int32_t", "int64_t", "uint8_t", "uint16_t", "uint32_t",
+      "uint64_t", "long",    "short",   "signed",  "size_t",   "true",
+      "unsigned", "wchar_t"};
 
   // Check if identifier in keywords set
   if (keywords.find(identifier) != keywords.end()) {
@@ -300,11 +285,7 @@ bool lexer::process_identifier(bool maybe_class_or_struct) {
     }
   }
 
-  if (identifier == "class" || identifier == "struct") {
-    return true;
-  } else {
-    return false;
-  }
+  return identifier == "class" || identifier == "struct";
 }
 
 void lexer::process_string() {
@@ -320,7 +301,8 @@ void lexer::process_string() {
 
     if (!escape && (current() == '"' || current() == '\'')) {
       break;
-    } else if (escape) {
+    }
+    if (escape) {
       escape = false;
     }
 
@@ -335,17 +317,6 @@ void lexer::process_string() {
   } else {
     fmt::format_to(std::back_inserter(*m_out), "{}", literal);
   }
-}
-
-std::size_t lexer::get_number_of_characters(std::string_view str) {
-  int count = 0;
-  for (std::size_t i = 0; i < str.size();) {
-    char c = str[i];
-    auto len = u8_seqlen(&c);
-    i += len;
-    count += 1;
-  }
-  return count;
 }
 
 void lexer::tokenize_and_pretty_print(std::string_view input,
@@ -363,15 +334,18 @@ void lexer::tokenize_and_pretty_print(std::string_view input,
         if (is_line_comment()) {
           process_line_comment();
           continue;
-        } else if (is_block_comment()) {
+        }
+        if (is_block_comment()) {
           process_block_comment();
           continue;
-        } else {
-          fmt::format_to(std::back_inserter(*out), "{}", c);
-          move_forward();
-          continue;
         }
-      } else if (is_start_of_identifier()) {
+
+        fmt::format_to(std::back_inserter(*out), "{}", c);
+        move_forward();
+        continue;
+      }
+
+      if (is_start_of_identifier()) {
         class_or_struct_keyword_encountered =
             process_identifier(class_or_struct_keyword_encountered);
       } else if (is_start_of_string()) {
