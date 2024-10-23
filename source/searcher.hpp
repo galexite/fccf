@@ -9,7 +9,7 @@
 #include <fmt/core.h>
 #include <thread_pool.hpp>
 
-namespace search {
+namespace fccf {
 
 using custom_printer_callback = std::function<void(
     std::string_view filename, bool is_stdout, unsigned start_line,

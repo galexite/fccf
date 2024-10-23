@@ -121,7 +121,7 @@ bool lexer::process_identifier(bool maybe_class_or_struct) {
   while (m_index < m_input.size()) {
     char c = current();
     if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
-        (c >= '0' && c <= '9') || (c == '_') || ((unsigned char)c >= 0x80)) {
+        (c >= '0' && c <= '9') || (c == '_') || ((unsigned char)c >= ascii_end)) {
       move_forward();
     } else {
       break;

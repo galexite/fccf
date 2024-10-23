@@ -12,6 +12,8 @@
 
 namespace fs = std::filesystem;
 
+enum class output_format { simple = 0, pretty, json };
+
 int main(int argc, char *argv[]) {
   auto is_stdout = isatty(STDOUT_FILENO) == 1;
   std::ios_base::sync_with_stdio(false);
@@ -31,10 +33,10 @@ int main(int argc, char *argv[]) {
       .default_value(false)
       .implicit_value(true);
 
-  program.add_argument("--json")
-      .help("Print results in JSON format")
-      .default_value(false)
-      .implicit_value(true);
+  program.add_argument("--format")
+      .help("Choose a format to output results in")
+      .default_value<std::string>("pretty")
+      .choices("simple", "pretty", "json");
 
   program.add_argument("-f", "--filter")
       .help("Only evaluate files that match any of these glob patterns")
@@ -217,14 +219,12 @@ int main(int argc, char *argv[]) {
   try {
     program.parse_args(argc, argv);
   } catch (const std::runtime_error &err) {
-    if (program.get<bool>("--help")) {
-      std::cout << program << std::endl;
-      return 0;
-    } else {
-      std::cerr << err.what() << std::endl;
-      std::cerr << program;
-      std::exit(1);
+    const bool is_help = program.get<bool>("--help");
+    if (!is_help) {
+      std::cerr << err.what() << '\n';
     }
+    std::cerr << program << '\n';
+    return is_help ? 0 : 1;
   }
 
   std::vector<std::string> paths;
@@ -282,7 +282,7 @@ int main(int argc, char *argv[]) {
       program.get<bool>("--ignore-single-line-results");
 
   auto no_color = program.get<bool>("--no-color");
-  auto is_json = program.get<bool>("--json");
+  auto format = program.get<bool>("--format");
 
   if (no_color) {
     is_stdout = false;
@@ -309,12 +309,12 @@ int main(int argc, char *argv[]) {
 
   std::vector<std::string> include_directory_list; // {"-I."};
 
-  for (auto &id : include_dirs) {
-    include_directory_list.push_back("-I" + id);
+  for (const auto &dir : include_dirs) {
+    include_directory_list.push_back("-I" + dir);
   }
 
   // Configure a searcher
-  search::searcher searcher;
+  fccf::searcher searcher;
   searcher.m_query = std::move(query);
   searcher.m_filters = std::move(filters);
   searcher.m_excludes = std::move(excludes);
@@ -384,12 +384,12 @@ int main(int argc, char *argv[]) {
   for (const auto &path : paths) {
     // Update clang options
     auto parent_path = path == "." ? "." : fs::path(path).parent_path();
-    auto parent_path_string = parent_path.c_str();
+    const auto *parent_path_string = parent_path.c_str();
 
     // Iterate over the `std::filesystem::directory_entry` elements using `auto`
     for (auto const &dir_entry :
          fs::recursive_directory_iterator(parent_path)) {
-      auto &path = dir_entry.path();
+      const auto &path = dir_entry.path();
       if (fs::is_directory(path)) {
         // If directory name is include
         std::string_view directory_name = path.filename().c_str();
