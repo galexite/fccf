@@ -14,6 +14,8 @@
 namespace fs = std::filesystem;
 using namespace std::string_view_literals;
 
+namespace fccf {
+
 namespace {
 
 void print_code_snippet(std::string_view filename, bool is_stdout,
@@ -61,73 +63,70 @@ bool exclude_directory(const char *path) {
                      });
 }
 
-CXChildVisit visitor(CXCursor cursor, CXCursor /*parent*/,
-                     CXClientData client_data) {
-  auto *args = reinterpret_cast<client_args *>(client_data);
-  auto searcher = args->searcher;
+struct client_args {
+  fccf::searcher *searcher;
+  std::string_view filename;
+  std::string_view haystack;
+};
+
+bool is_hit(searcher *searcher, CXCursor cursor) {
+  return (searcher->m_search_expressions &&
+          (cursor.kind == CXCursor_DeclRefExpr ||
+           cursor.kind == CXCursor_MemberRefExpr ||
+           cursor.kind == CXCursor_MemberRef ||
+           cursor.kind == CXCursor_FieldDecl)) ||
+         (searcher->m_search_for_enum && cursor.kind == CXCursor_EnumDecl) ||
+         (searcher->m_search_for_struct &&
+          cursor.kind == CXCursor_StructDecl) ||
+         (searcher->m_search_for_union && cursor.kind == CXCursor_UnionDecl) ||
+         (searcher->m_search_for_member_function &&
+          cursor.kind == CXCursor_CXXMethod) ||
+         (searcher->m_search_for_function &&
+          cursor.kind == CXCursor_FunctionDecl) ||
+         (searcher->m_search_for_function_template &&
+          cursor.kind == CXCursor_FunctionTemplate) ||
+         (searcher->m_search_for_class && cursor.kind == CXCursor_ClassDecl) ||
+         (searcher->m_search_for_class_template &&
+          cursor.kind == CXCursor_ClassTemplate) ||
+         (searcher->m_search_for_class_constructor &&
+          cursor.kind == CXCursor_Constructor) ||
+         (searcher->m_search_for_class_destructor &&
+          cursor.kind == CXCursor_Destructor) ||
+         (searcher->m_search_for_typedef &&
+          cursor.kind == CXCursor_TypedefDecl) ||
+         (searcher->m_search_for_using_declaration &&
+          (cursor.kind == CXCursor_UsingDirective ||
+           cursor.kind == CXCursor_UsingDeclaration ||
+           cursor.kind == CXCursor_TypeAliasDecl)) ||
+         (searcher->m_search_for_namespace_alias &&
+          cursor.kind == CXCursor_NamespaceAlias) ||
+         (searcher->m_search_for_variable_declaration &&
+          cursor.kind == CXCursor_VarDecl) ||
+         (searcher->m_search_for_parameter_declaration &&
+          cursor.kind == CXCursor_ParmDecl) ||
+         (searcher->m_search_for_static_cast &&
+          cursor.kind == CXCursor_CXXStaticCastExpr) ||
+         (searcher->m_search_for_dynamic_cast &&
+          cursor.kind == CXCursor_CXXDynamicCastExpr) ||
+         (searcher->m_search_for_reinterpret_cast &&
+          cursor.kind == CXCursor_CXXReinterpretCastExpr) ||
+         (searcher->m_search_for_const_cast &&
+          cursor.kind == CXCursor_CXXConstCastExpr) ||
+         (searcher->m_search_for_throw_expression &&
+          cursor.kind == CXCursor_CXXThrowExpr) ||
+         (searcher->m_search_for_for_statement &&
+          (cursor.kind == CXCursor_ForStmt ||
+           cursor.kind == CXCursor_CXXForRangeStmt));
+}
+
+CXChildVisitResult visitor(CXCursor cursor, CXCursor /*parent*/,
+                           CXClientData client_data) {
+  auto *args = static_cast<client_args *>(client_data);
+  auto *searcher = args->searcher;
   auto filename = args->filename;
   auto haystack = args->haystack;
 
-  /*
-    CXCursor_CXXStaticCastExpr
-    C++'s static_cast<> expression.
-
-    CXCursor_CXXDynamicCastExpr
-    C++'s dynamic_cast<> expression.
-
-    CXCursor_CXXReinterpretCastExpr
-    C++'s reinterpret_cast<> expression.
-
-    CXCursor_CXXConstCastExpr
-    C++'s const_cast<> expression.
-  */
-
-  if ((searcher->m_search_expressions &&
-       (cursor.kind == CXCursor_DeclRefExpr ||
-        cursor.kind == CXCursor_MemberRefExpr ||
-        cursor.kind == CXCursor_MemberRef ||
-        cursor.kind == CXCursor_FieldDecl)) ||
-      (searcher->m_search_for_enum && cursor.kind == CXCursor_EnumDecl) ||
-      (searcher->m_search_for_struct && cursor.kind == CXCursor_StructDecl) ||
-      (searcher->m_search_for_union && cursor.kind == CXCursor_UnionDecl) ||
-      (searcher->m_search_for_member_function &&
-       cursor.kind == CXCursor_CXXMethod) ||
-      (searcher->m_search_for_function &&
-       cursor.kind == CXCursor_FunctionDecl) ||
-      (searcher->m_search_for_function_template &&
-       cursor.kind == CXCursor_FunctionTemplate) ||
-      (searcher->m_search_for_class && cursor.kind == CXCursor_ClassDecl) ||
-      (searcher->m_search_for_class_template &&
-       cursor.kind == CXCursor_ClassTemplate) ||
-      (searcher->m_search_for_class_constructor &&
-       cursor.kind == CXCursor_Constructor) ||
-      (searcher->m_search_for_class_destructor &&
-       cursor.kind == CXCursor_Destructor) ||
-      (searcher->m_search_for_typedef && cursor.kind == CXCursor_TypedefDecl) ||
-      (searcher->m_search_for_using_declaration &&
-       (cursor.kind == CXCursor_UsingDirective ||
-        cursor.kind == CXCursor_UsingDeclaration ||
-        cursor.kind == CXCursor_TypeAliasDecl)) ||
-      (searcher->m_search_for_namespace_alias &&
-       cursor.kind == CXCursor_NamespaceAlias) ||
-      (searcher->m_search_for_variable_declaration &&
-       cursor.kind == CXCursor_VarDecl) ||
-      (searcher->m_search_for_parameter_declaration &&
-       cursor.kind == CXCursor_ParmDecl) ||
-      (searcher->m_search_for_static_cast &&
-       cursor.kind == CXCursor_CXXStaticCastExpr) ||
-      (searcher->m_search_for_dynamic_cast &&
-       cursor.kind == CXCursor_CXXDynamicCastExpr) ||
-      (searcher->m_search_for_reinterpret_cast &&
-       cursor.kind == CXCursor_CXXReinterpretCastExpr) ||
-      (searcher->m_search_for_const_cast &&
-       cursor.kind == CXCursor_CXXConstCastExpr) ||
-      (searcher->m_search_for_throw_expression &&
-       cursor.kind == CXCursor_CXXThrowExpr) ||
-      (searcher->m_search_for_for_statement &&
-       (cursor.kind == CXCursor_ForStmt ||
-        cursor.kind == CXCursor_CXXForRangeStmt))) {
-
+  if (is_hit(searcher, cursor)) {
     auto source_range = clang_getCursorExtent(cursor);
     auto start_location = clang_getRangeStart(source_range);
     auto end_location = clang_getRangeEnd(source_range);
@@ -148,8 +147,8 @@ CXChildVisit visitor(CXCursor cursor, CXCursor /*parent*/,
     if ((!searcher->m_ignore_single_line_results && end_line >= start_line) ||
         (searcher->m_ignore_single_line_results && end_line > start_line)) {
       std::string_view name =
-          reinterpret_cast<const char *>(clang_getCursorSpelling(cursor).data);
-      std::string_view query = searcher->m_query.data();
+          static_cast<const char *>(clang_getCursorSpelling(cursor).data);
+      std::string_view query = searcher->m_query;
 
       if (query.empty() ||
           (
@@ -249,10 +248,6 @@ bool is_whitelisted(std::string_view str) {
                      });
 }
 
-} // namespace
-
-namespace fccf {
-
 std::string_view::const_iterator
 needle_search(std::string_view needle,
               std::string_view::const_iterator haystack_begin,
@@ -264,35 +259,51 @@ needle_search(std::string_view needle,
   return haystack_end;
 }
 
+std::string get_file_contents(const char *filename) {
+  std::FILE *fp = std::fopen(filename, "rb");
+  if (fp) {
+    std::string contents;
+    std::fseek(fp, 0, SEEK_END);
+    contents.resize(std::ftell(fp));
+    std::rewind(fp);
+    const auto size = std::fread(contents.data(), 1, contents.size(), fp);
+    std::fclose(fp);
+    return (contents);
+  }
+  return "";
+}
+
+} // namespace
+
 void searcher::file_search(std::string_view filename,
                            std::string_view haystack) {
   // Start from the beginning
-  const auto haystack_begin = haystack.cbegin();
-  const auto haystack_end = haystack.cend();
+  const auto *haystack_begin = haystack.cbegin();
+  const auto *haystack_end = haystack.cend();
 
-  auto it = haystack_begin;
+  const auto *ptr = haystack_begin;
   bool first_search = true;
   bool printed_file_name = false;
   std::size_t current_line_number = 1;
   auto no_file_name = filename.empty();
 
 #if defined(HAVE_SIMD_STRSTR)
-  std::string_view view(it, haystack_end - it);
+  std::string_view view(ptr, haystack_end - ptr);
   if (view.empty()) {
-    it = haystack_end;
+    ptr = haystack_end;
   } else {
-    auto pos = STRSTR_IMPL(std::string_view(it, haystack_end - it), m_query);
+    auto pos = STRSTR_IMPL(std::string_view(ptr, haystack_end - ptr), m_query);
     if (pos != std::string::npos) {
-      it += pos;
+      ptr += pos;
     } else {
-      it = haystack_end;
+      ptr = haystack_end;
     }
   }
 #else
   it = needle_search(m_query, it, haystack_end);
 #endif
 
-  if (it != haystack_end) {
+  if (ptr != haystack_end) {
     // analyze file
     const char *path = filename.data();
     if (m_verbose) {
@@ -319,8 +330,7 @@ void searcher::file_search(std::string_view filename,
       fmt::print("\n");
     }
 
-    CXIndex index;
-
+    CXIndex index = nullptr;
     if (m_verbose) {
       index = clang_createIndex(0, 1);
     } else {
@@ -339,34 +349,15 @@ void searcher::file_search(std::string_view filename,
 
     CXCursor cursor = clang_getTranslationUnitCursor(unit);
 
-    struct client_args {
-      searcher *searcher;
-      std::string_view filename;
-      std::string_view haystack;
-    };
     client_args args = {this, filename, haystack};
 
-    if (clang_visitChildren(cursor, visitor, (void *)(&args))) {
+    if (clang_visitChildren(cursor, visitor, (void *)(&args)) > 0) {
       fmt::print("Error: Visit children failed for {}\n)", path);
     }
 
     clang_disposeTranslationUnit(unit);
     clang_disposeIndex(index);
   }
-}
-
-std::string get_file_contents(const char *filename) {
-  std::FILE *fp = std::fopen(filename, "rb");
-  if (fp) {
-    std::string contents;
-    std::fseek(fp, 0, SEEK_END);
-    contents.resize(std::ftell(fp));
-    std::rewind(fp);
-    const auto size = std::fread(contents.data(), 1, contents.size(), fp);
-    std::fclose(fp);
-    return (contents);
-  }
-  return "";
 }
 
 void searcher::read_file_and_search(const char *path) {

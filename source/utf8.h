@@ -1,6 +1,6 @@
+#include <cstddef>
 #include <cstdint>
-
-#include <stdarg.h>
+#include <cstdarg>
 
 /* is c the start of a utf8 sequence? */
 #define isutf(c) (((c)&0xC0) != 0x80)
@@ -59,7 +59,7 @@ char *u8_strchr(char *s, uint32_t ch, int *charn);
 
 /* same as the above, but searches a buffer of a given size instead of
    a NUL-terminated string. */
-char *u8_memchr(char *s, uint32_t ch, size_t sz, int *charn);
+char *u8_memchr(char *s, uint32_t ch, std::size_t sz, int *charn);
 
 /* count the number of characters in a UTF-8 string */
 int u8_strlen(char *s);

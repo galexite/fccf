@@ -4,15 +4,40 @@
 #include <nlohmann/json.hpp>
 #include <unistd.h>
 
+#include <cstdint>
 #include <filesystem>
 #include <iostream>
+#include <sstream>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <vector>
 
 namespace fs = std::filesystem;
 
-enum class output_format { simple = 0, pretty, json };
+namespace {
+
+enum class output_format : std::uint8_t { simple = 0, pretty, json };
+
+output_format to_format(const std::string &format) {
+    if (format == "simple") {
+        return output_format::simple;
+    }
+    if (format == "pretty") {
+        return output_format::pretty;
+    }
+    if (format == "json") {
+        return output_format::json;
+    }
+    throw std::runtime_error(fmt::format("unknown format: {}", format));
+}
+
+bool ends_with(std::string_view str, std::string_view suffix) {
+return str.size() >= suffix.size() &&
+        0 == str.compare(str.size() - suffix.size(), suffix.size(), suffix);
+};
+
+}
 
 int main(int argc, char *argv[]) {
   auto is_stdout = isatty(STDOUT_FILENO) == 1;
@@ -57,7 +82,7 @@ int main(int argc, char *argv[]) {
   program.add_argument("-j")
       .help("Number of threads")
       .scan<'d', int>()
-      .default_value(5);
+      .default_value(2);
 
   program.add_argument("--enum")
       .help("Search for enum declaration")
@@ -227,12 +252,10 @@ int main(int argc, char *argv[]) {
     return is_help ? 0 : 1;
   }
 
-  std::vector<std::string> paths;
-  try {
-    paths = program.get<std::vector<std::string>>("path");
-  } catch (const std::logic_error &e) {
+  auto paths = program.get<std::vector<std::string>>("path");
+  if (paths.empty()) {
     // No path provided
-    paths = {"."};
+    paths.emplace_back(".");
   }
   auto query = program.get<std::string>("query");
   auto exact_match = program.get<bool>("--exact-match");
@@ -282,7 +305,7 @@ int main(int argc, char *argv[]) {
       program.get<bool>("--ignore-single-line-results");
 
   auto no_color = program.get<bool>("--no-color");
-  auto format = program.get<bool>("--format");
+  auto format = to_format(program.get<std::string>("--format"));
 
   if (no_color) {
     is_stdout = false;
@@ -302,13 +325,8 @@ int main(int argc, char *argv[]) {
         search_for_any_cast || search_for_throw_expression ||
         search_for_for_statement);
 
-  auto ends_with = [](std::string_view str, std::string_view suffix) -> bool {
-    return str.size() >= suffix.size() &&
-           0 == str.compare(str.size() - suffix.size(), suffix.size(), suffix);
-  };
-
-  std::vector<std::string> include_directory_list; // {"-I."};
-
+  std::vector<std::string> include_directory_list;
+  include_directory_list.reserve(include_dirs.size());
   for (const auto &dir : include_dirs) {
     include_directory_list.push_back("-I" + dir);
   }
@@ -367,9 +385,9 @@ int main(int argc, char *argv[]) {
   searcher.m_ts = std::make_unique<thread_pool>(num_threads);
 
   nlohmann::json json_array = nlohmann::json::array();
-  if (is_json) {
+  if (format == output_format::json) {
     searcher.m_custom_printer =
-        [&json_array](std::string_view filename, bool is_stdout,
+        [&json_array](std::string_view filename, bool /*is_stdout*/,
                       unsigned start_line, unsigned end_line,
                       std::string_view code_snippet) {
           nlohmann::json obj;
@@ -383,8 +401,10 @@ int main(int argc, char *argv[]) {
 
   for (const auto &path : paths) {
     // Update clang options
-    auto parent_path = path == "." ? "." : fs::path(path).parent_path();
-    const auto *parent_path_string = parent_path.c_str();
+    auto parent_path = fs::path(path).parent_path();
+    if (parent_path.empty() || parent_path == ".") {
+      parent_path = ".";
+    }
 
     // Iterate over the `std::filesystem::directory_entry` elements using `auto`
     for (auto const &dir_entry :
@@ -394,7 +414,10 @@ int main(int argc, char *argv[]) {
         // If directory name is include
         std::string_view directory_name = path.filename().c_str();
         if (ends_with(directory_name, "include")) {
-          include_directory_list.push_back("-I" + std::string{path});
+          std::stringstream ss;
+          ss << "-I";
+          ss << path;
+          include_directory_list.push_back(ss.str());
         }
       }
     }
@@ -417,9 +440,9 @@ int main(int argc, char *argv[]) {
     // Run the search
 
     if (fs::is_regular_file(fs::path(path))) {
-      searcher.read_file_and_search((const char *)path.c_str());
+      searcher.read_file_and_search(path.c_str());
     } else if (fs::is_directory(fs::path(path))) {
-      searcher.directory_search((const char *)path.c_str());
+      searcher.directory_search(path.c_str());
     } else {
       fmt::print(fmt::fg(fmt::color::red) | fmt::emphasis::bold,
                  "\nError: '{}' is not a valid file or directory\n", path);
@@ -427,7 +450,7 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  if (is_json) {
+  if (format == output_format::json) {
     std::cout << json_array.dump();
   }
   return 0;
